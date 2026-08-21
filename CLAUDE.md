@@ -211,9 +211,17 @@ Logic:
    proceeding. No audio-extraction step — the transcription model
    accepts common video containers (mp4 etc.) directly.
 4. Generate a ~150-word summary from body_text via the shared call_llm
-   helper (same as Summarize) and return {content_id, summary}. The
-   summary itself is NOT persisted — regenerated on every call, same
-   pattern as the Summarize agent.
+   helper and return {content_id, summary}. The summary itself is NOT
+   persisted — regenerated on every call, same pattern as the Summarize
+   agent.
+
+   Prompt history: briefly unified with Summarize's prompt via a shared
+   summarize_text() helper (2026-08-21), then reversed the same day —
+   video transcripts have different artifacts than articles (filler
+   words, speaker labels, timestamps) and this agent's own target length
+   (~150 words) always differed from Summarize's (60-word cap). Back to
+   its own _SUMMARY_SYSTEM_PROMPT in video_transcript_summary.py; still
+   shares the call_llm wrapper, just not the prompt text.
 
 Speech-to-text approach (confirmed with Varun 2026-08-20): use the
 Whisper/gpt-4o-transcribe model on the same beyondportal-foundry
@@ -288,6 +296,50 @@ every file had usable metadata.
 Known POC-scope limitation, not a bug: no chunking for files over the
 transcription API's 25MB limit. Add only if a real video actually hits
 that size (Section 5 ladder — don't build for a hypothetical).
+
+9.2 Ask AI Agent — Grounding Fix (2026-08-21)
+
+Verified with a real unrelated question ("what is the recipe for
+chocolate cake") that the agent already refused correctly rather than
+hallucinating — that part of the grounding guardrail (Section 11.1) was
+already working. Testing surfaced a real, narrower gap: a question that
+coincidentally shares a generic word with real content (e.g. "strategy",
+which appeared in 9 of our 12 articles) could retrieve irrelevant context;
+the LLM still correctly declined to answer from it, but source_content_ids
+kept claiming those items as sources anyway — a real UI inconsistency
+("based on: X" shown next to "I don't have relevant content").
+
+Two fixes in agents/ask_ai.py:
+- _retrieve() now drops any keyword appearing in more than half the
+  corpus before scoring — adapts to whatever words are actually
+  over-common in the real content, instead of a hardcoded stopword list
+  needing constant tuning.
+- source_content_ids is now derived from the model's own answer: if it
+  contains the refusal phrasing the system prompt asks for ("...have
+  relevant content..."), source_content_ids is forced to [] regardless of
+  what got retrieved. This is the more robust fix — no keyword heuristic
+  over a 12-document corpus can eliminate every coincidental overlap
+  (that would need real semantic search, out of scope per Section 6 #8),
+  but the model's own grounding judgment is a reliable enough signal for
+  whether to attribute sources.
+
+Unrelated but found while testing this: 7 leftover fictional content_items
+rows (c009-c012, v005-v007) were sitting in the real database, matching
+an early pre-real-domain content draft, dated the same day they were
+found. Source unclear (not from a seed.py run that could be reconstructed
+this session — that run was verified rolled back). Deleted after
+confirming no engagement_signal/recommendations rows referenced them.
+
+Known POC-scope limitation, accepted 2026-08-21: beyondportal-db runs on
+Azure SQL's General Purpose Serverless tier (GP_S_Gen5, min capacity 0.5
+vCore), which scales compute up/down dynamically and causes inconsistent
+query latency (the same query on the same open connection measured 6.7s,
+then 0.88s, then 9s) — this is also the cause of the earlier "database
+not currently available, retry" (40613) errors. Ask AI (#8) feels this
+most since its retrieval scans the whole content_items table rather than
+a single-row lookup by primary key. Confirmed with the user this is an
+acceptable tradeoff for the POC rather than raising minCapacity (a real
+Azure cost change) — revisit if latency becomes a real problem.
 
 7. Routing — Rule-Based, Not LLM Supervisor
 

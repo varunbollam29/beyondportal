@@ -49,7 +49,8 @@ class AskAIRequest(BaseModel):
 
 
 class VideoSummaryRequest(BaseModel):
-    content_id: str
+    content_id: str | None = None
+    video_url: str | None = None
 
 
 def _handle(fn, *args, **kwargs):
@@ -107,4 +108,4 @@ def ask_ai_route(body: AskAIRequest, db: Session = Depends(get_db)):
 
 @app.post("/video-summary")
 def video_summary(body: VideoSummaryRequest, db: Session = Depends(get_db)):
-    return _handle(get_video_summary, db, body.content_id)
+    return _handle(get_video_summary, db, body.content_id, body.video_url)
