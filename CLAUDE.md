@@ -189,8 +189,10 @@ types, no feature built around them (confirmed with Varun 2026-08-20).
 7	Insight	GET /insights/{user_id}	dashboard widget	user_id, recent engagement_signal rows	1-2 sentence narrative about the user's activity pattern	Single LLM call summarizing recent signals — do not build a separate analytics pipeline for this
 8	Ask AI	POST /ask-ai	chat input	user_id, question	grounded answer + which content_id it drew from	Retrieval = keyword match over content_items.body_text (no vector DB for POC) + LLM call with retrieved context in the prompt
 9	Video Transcript & Summary	POST /video-summary	video content item opened	content_id	{content_id, summary}	See detailed spec below
+10	Article Insight	POST /article-insight	"Insight" click on an article	content_id	{content_id, insight_text}	Added 2026-08-21, confirmed with Varun. Per-article, not per-user — distinct from Insight (#7), which observes a user's activity pattern. Surfaces one interpretive observation (why the article matters) rather than a factual recap (that's Summarize's job) or a bulleted fact list (that's Takeaways' job).
+11	Takeaways	POST /takeaways	"Takeaways" click on an article	content_id	{content_id, takeaways}	Added 2026-08-21, confirmed with Varun. Bulleted list of 3-5 concrete, extractable facts from the article — distinct from Summarize's narrative prose and Article Insight's single interpretive point.
 
-All LLM-calling agents (4, 5, 6, 7, 8, 9) should share one thin wrapper
+All LLM-calling agents (4, 5, 6, 7, 8, 9, 10, 11) should share one thin wrapper
 function for calling Azure OpenAI (endpoint, key, deployment from config) —
 do not write six separate client-construction blocks.
 
@@ -355,6 +357,8 @@ POST /translate          -> Translate Agent
 GET  /insights           -> Insight Agent
 POST /ask-ai             -> Ask AI Agent
 POST /video-summary      -> Video Transcript & Summary Agent
+POST /article-insight    -> Article Insight Agent
+POST /takeaways          -> Takeaways Agent
 
 Implement this as normal FastAPI route functions — do not build a
 "supervisor agent" or intent classifier on top of it.
@@ -390,6 +394,8 @@ they're explicitly parallel-safe.
  3.6 backend/agents/insight.py
  3.7 backend/agents/ask_ai.py
  3.8 backend/agents/video_transcript_summary.py (added 2026-08-20, see Section 6 #9)
+ 3.9 backend/agents/article_insight.py (added 2026-08-21, see Section 6 #10)
+ 3.10 backend/agents/takeaways.py (added 2026-08-21, see Section 6 #11)
  4.1 backend/main.py — wires all routes per Section 7 table
  5.1 Manual test each endpoint with a real request (curl/Postman), confirm DB rows and LLM responses look correct
  5.2 Run the full Lucy demo sequence: load dashboard -> read article -> score updates -> click Summarize -> click Ask AI

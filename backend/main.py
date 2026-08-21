@@ -8,12 +8,14 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from agents.article_insight import get_article_insight
 from agents.ask_ai import ask_ai
 from agents.insight import get_insight
 from agents.recommendation import get_recommendations
 from agents.signal_ingestion import log_signal
 from agents.simplify import simplify_content
 from agents.summarize import summarize_content
+from agents.takeaways import get_takeaways
 from agents.translate import translate_content
 from agents.video_transcript_summary import get_video_summary
 from db import get_db
@@ -51,6 +53,14 @@ class AskAIRequest(BaseModel):
 class VideoSummaryRequest(BaseModel):
     content_id: str | None = None
     video_url: str | None = None
+
+
+class ArticleInsightRequest(BaseModel):
+    content_id: str
+
+
+class TakeawaysRequest(BaseModel):
+    content_id: str
 
 
 def _handle(fn, *args, **kwargs):
@@ -109,3 +119,13 @@ def ask_ai_route(body: AskAIRequest, db: Session = Depends(get_db)):
 @app.post("/video-summary")
 def video_summary(body: VideoSummaryRequest, db: Session = Depends(get_db)):
     return _handle(get_video_summary, db, body.content_id, body.video_url)
+
+
+@app.post("/article-insight")
+def article_insight(body: ArticleInsightRequest, db: Session = Depends(get_db)):
+    return _handle(get_article_insight, db, body.content_id)
+
+
+@app.post("/takeaways")
+def takeaways(body: TakeawaysRequest, db: Session = Depends(get_db)):
+    return _handle(get_takeaways, db, body.content_id)
