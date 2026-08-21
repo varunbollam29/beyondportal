@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+sqlalchemy
+pyodbc
+openai
+azure-storage-blob
+python-dotenv
+pypdf
